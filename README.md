@@ -116,10 +116,10 @@ This means:
 
 Each team member will work on their own Java file inside `src/`:
 
-* `Preprocessor.java` – Giang
-* `J48Classifier.java` – Member A
-* `ImprovedModel.java` – Member B
-* `Evaluator.java` – Member C
+* `Preprocessor.java` – Mai
+* `J48Classifier.java` – Kiệt
+* `ImprovedModel.java` – Huy
+* `Evaluator.java` – Châu
 
 To compile any file:
 
