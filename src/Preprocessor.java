@@ -20,7 +20,7 @@ public class Preprocessor {
         }
 
         // print Basic data set summary
-        printDatasetSumaary(data);
+        printDatasetSummary(data);
 
         // print Missing and Zero values report
         printMissingAndZeroReport(data);
@@ -38,7 +38,7 @@ public class Preprocessor {
         return outputArffPath;
     }
 
-    public static void printDatasetSumaary(Instances data) {
+    public static void printDatasetSummary(Instances data) {
         System.out.println("=== Dataset Summary ===");
         System.out.println("Number of instances: " + data.numInstances());
         System.out.println("Number of attributes: " + data.numAttributes());
