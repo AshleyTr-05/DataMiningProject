@@ -45,6 +45,7 @@ public class Preprocessor {
 
         printMissingAndZeroReport(data);
 
+        // Normalize numeric attributes
         System.out.println();
         normalizeNumericAttributes(data);
         System.out.println("=== NORMALIZATION COMPLETED ===");
