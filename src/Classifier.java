@@ -5,7 +5,7 @@ import weka.classifiers.Evaluation;
 
 import java.util.Random;
 
-public class ClassifierExample {
+public class Classifier {
 
     public static void main(String[] args) throws Exception {
 
