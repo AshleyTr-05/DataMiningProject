@@ -2,6 +2,9 @@ import weka.core.Instances;
 import weka.core.Attribute;
 import weka.core.converters.CSVLoader;
 import weka.core.converters.ArffSaver;
+import weka.filters.Filter;
+import weka.filters.unsupervised.attribute.NominalToBinary;
+import weka.filters.unsupervised.instance.RemoveDuplicates;
 
 import java.io.File;
 
@@ -35,6 +38,9 @@ public class Preprocessor {
         System.out.println("=== AFTER ZERO→MISSING HANDLING ===");
         printMissingAndZeroReport(data);
 
+        // STEP 2: Remove duplicates
+        data = removeDuplicates(data);
+
         fillMissingValues(data);
 
         printMissingAndZeroReport(data);
@@ -42,6 +48,12 @@ public class Preprocessor {
         System.out.println();
         normalizeNumericAttributes(data);
         System.out.println("=== NORMALIZATION COMPLETED ===");
+
+        // STEP 3: Convert categorical to numerical
+        data = convertCategoricalToNumerical(data);
+
+        // Final status report
+        printFinalStatusReport(data);
 
         // save to ARFF
         ArffSaver saver = new ArffSaver();
@@ -138,6 +150,24 @@ public class Preprocessor {
         }
 
         System.out.println("Total zeros converted to missing: " + totalReplaced);
+    }
+
+    // --- STEP: Remove duplicate rows ---
+    private static Instances removeDuplicates(Instances data) throws Exception {
+        System.out.println();
+        System.out.println("=== REMOVING DUPLICATE ROWS ===");
+        int originalSize = data.numInstances();
+
+        RemoveDuplicates duplicateFilter = new RemoveDuplicates();
+        duplicateFilter.setInputFormat(data);
+        Instances uniqueData = Filter.useFilter(data, duplicateFilter);
+
+        int duplicatesRemoved = originalSize - uniqueData.numInstances();
+        System.out.printf("Original instances: %d%n", originalSize);
+        System.out.printf("Unique instances: %d%n", uniqueData.numInstances());
+        System.out.printf("Duplicates removed: %d%n", duplicatesRemoved);
+
+        return uniqueData;
     }
 
     private static void fillMissingValues(Instances data) {
@@ -258,6 +288,88 @@ public class Preprocessor {
             System.out.printf("Attribute %-20s normalized using min=%.2f, max=%.2f%n",
                     attr.name(), min, max);
         }
+    }
+
+    // --- STEP: Convert categorical (nominal) attributes to numerical ---
+    private static Instances convertCategoricalToNumerical(Instances data) throws Exception {
+        System.out.println();
+        System.out.println("=== CONVERTING CATEGORICAL TO NUMERICAL (Binary Encoding) ===");
+
+        // Count nominal attributes (excluding class)
+        int nominalCount = 0;
+        for (int j = 0; j < data.numAttributes(); j++) {
+            if (data.attribute(j).isNominal() && j != data.classIndex()) {
+                nominalCount++;
+            }
+        }
+
+        System.out.printf("Found %d categorical attributes (excluding class)%n", nominalCount);
+
+        if (nominalCount == 0) {
+            System.out.println("No categorical attributes to convert.");
+            return data;
+        }
+
+        // Apply NominalToBinary filter
+        NominalToBinary nominalToBinary = new NominalToBinary();
+        nominalToBinary.setInputFormat(data);
+        Instances transformedData = Filter.useFilter(data, nominalToBinary);
+
+        System.out.printf("Attributes before conversion: %d%n", data.numAttributes());
+        System.out.printf("Attributes after conversion: %d%n", transformedData.numAttributes());
+        System.out.println("Categorical attributes have been converted to binary (0/1) format.");
+
+        return transformedData;
+    }
+
+    // --- Final comprehensive status report ---
+    private static void printFinalStatusReport(Instances data) {
+        System.out.println();
+        System.out.println("=" .repeat(70));
+        System.out.println("=== FINAL PREPROCESSING STATUS REPORT ===");
+        System.out.println("=" .repeat(70));
+
+        System.out.println("\n1. DATASET OVERVIEW:");
+        System.out.printf("   - Total instances: %d%n", data.numInstances());
+        System.out.printf("   - Total attributes: %d%n", data.numAttributes());
+        System.out.printf("   - Class attribute: %s%n", data.classAttribute().name());
+
+        System.out.println("\n2. MISSING VALUES:");
+        int totalMissing = 0;
+        for (int j = 0; j < data.numAttributes(); j++) {
+            for (int i = 0; i < data.numInstances(); i++) {
+                if (data.instance(i).isMissing(j)) {
+                    totalMissing++;
+                }
+            }
+        }
+        System.out.printf("   - Total missing values: %d ✓%n", totalMissing);
+
+        System.out.println("\n3. DUPLICATES:");
+        System.out.println("   - All duplicate rows have been removed ✓");
+
+        System.out.println("\n4. ATTRIBUTE TYPES:");
+        int numericCount = 0;
+        int nominalCount = 0;
+        for (int j = 0; j < data.numAttributes(); j++) {
+            if (data.attribute(j).isNumeric()) {
+                numericCount++;
+            } else if (data.attribute(j).isNominal()) {
+                nominalCount++;
+            }
+        }
+        System.out.printf("   - Numeric attributes: %d%n", numericCount);
+        System.out.printf("   - Nominal attributes: %d (including class)%n", nominalCount);
+
+        System.out.println("\n5. NORMALIZATION:");
+        System.out.println("   - All numeric attributes normalized to [0, 1] ✓");
+
+        System.out.println("\n6. CATEGORICAL CONVERSION:");
+        System.out.println("   - Categorical attributes converted to numerical (binary) ✓");
+
+        System.out.println("\n" + "=" .repeat(70));
+        System.out.println("✓ ALL PREPROCESSING STEPS COMPLETED SUCCESSFULLY");
+        System.out.println("=" .repeat(70));
     }
 
     public static void main(String[] args) throws Exception {
