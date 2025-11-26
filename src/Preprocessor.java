@@ -35,7 +35,7 @@ public class Preprocessor {
 
         // print Missing and Zero values report (AFTER cleaning)
         System.out.println();
-        System.out.println("=== AFTER ZERO→MISSING HANDLING ===");
+        System.out.println("=== AFTER ZERO TO MISSING HANDLING ===");
         printMissingAndZeroReport(data);
 
         // STEP 2: Remove duplicates
@@ -86,7 +86,7 @@ public class Preprocessor {
 
     // --- Helper: report missing and zero values for each attribute ---
     private static void printMissingAndZeroReport(Instances data) {
-        System.out.println("=== MISSING / ZERO VALUE REPORT ===");
+        System.out.println("=== MISSING OR ZERO VALUE REPORT ===");
         int numInstances = data.numInstances();
 
         for (int j = 0; j < data.numAttributes(); j++) {
@@ -113,16 +113,21 @@ public class Preprocessor {
         System.out.println("      Later we will decide which attributes treat 0 as 'missing'.");
     }
 
-    // --- NEW STEP: treat 0 as missing for selected numeric attributes ---
+    // --- STEP: treat 0 as missing for selected numeric attributes ---
     private static void handleZeroAsMissing(Instances data) {
         System.out.println();
         System.out.println("=== HANDLING ZERO VALUES AS MISSING FOR SELECTED ATTRIBUTES ===");
 
         // List of attribute names where 0 is considered invalid/missing
         String[] zeroAsMissingAttrs = {
-                "chol", "cholesterol", // possible names for cholesterol
-                "trestbps", "restingbp", // resting blood pressure
-                "thalach", "maxhr", "max_heart_rate"
+                "age",
+                "blood_pressure",
+                "cholesterol_level",
+                "bmi",
+                "triglyceride_level",
+                "fasting_blood_sugar",
+                "crp_level",
+                "homocysteine_level",
         };
 
         int totalReplaced = 0;
@@ -245,7 +250,7 @@ public class Preprocessor {
         System.out.println("Total missing values filled: " + totalFilled);
     }
 
-    // --- NEW STEP: normalize numeric attributes to [0, 1] ---
+    // --- STEP: normalize numeric attributes to [0, 1] ---
     private static void normalizeNumericAttributes(Instances data) {
         System.out.println("=== NORMALIZING NUMERIC ATTRIBUTES TO [0, 1] ===");
 
@@ -326,9 +331,9 @@ public class Preprocessor {
     // --- Final comprehensive status report ---
     private static void printFinalStatusReport(Instances data) {
         System.out.println();
-        System.out.println("=" .repeat(70));
+        System.out.println("=".repeat(70));
         System.out.println("=== FINAL PREPROCESSING STATUS REPORT ===");
-        System.out.println("=" .repeat(70));
+        System.out.println("=".repeat(70));
 
         System.out.println("\n1. DATASET OVERVIEW:");
         System.out.printf("   - Total instances: %d%n", data.numInstances());
@@ -344,10 +349,10 @@ public class Preprocessor {
                 }
             }
         }
-        System.out.printf("   - Total missing values: %d ✓%n", totalMissing);
+        System.out.printf("   - Total missing values: %d %n", totalMissing);
 
         System.out.println("\n3. DUPLICATES:");
-        System.out.println("   - All duplicate rows have been removed ✓");
+        System.out.println("   - All duplicate rows have been removed ");
 
         System.out.println("\n4. ATTRIBUTE TYPES:");
         int numericCount = 0;
@@ -363,14 +368,14 @@ public class Preprocessor {
         System.out.printf("   - Nominal attributes: %d (including class)%n", nominalCount);
 
         System.out.println("\n5. NORMALIZATION:");
-        System.out.println("   - All numeric attributes normalized to [0, 1] ✓");
+        System.out.println("   - All numeric attributes normalized to [0, 1] ");
 
         System.out.println("\n6. CATEGORICAL CONVERSION:");
-        System.out.println("   - Categorical attributes converted to numerical (binary) ✓");
+        System.out.println("   - Categorical attributes converted to numerical (binary) ");
 
-        System.out.println("\n" + "=" .repeat(70));
-        System.out.println("✓ ALL PREPROCESSING STEPS COMPLETED SUCCESSFULLY");
-        System.out.println("=" .repeat(70));
+        System.out.println("\n" + "=".repeat(70));
+        System.out.println(" ALL PREPROCESSING STEPS COMPLETED SUCCESSFULLY");
+        System.out.println("=".repeat(70));
     }
 
     public static void main(String[] args) throws Exception {
