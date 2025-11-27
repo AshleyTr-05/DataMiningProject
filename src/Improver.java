@@ -52,7 +52,6 @@ public class Improver {
         rf.setMaxDepth(0);
 
         // cost matrix: rows = actual, cols = predicted
-        // giả sử class 0 = No, class 1 = Yes
         CostMatrix costMatrix = new CostMatrix(2);
         costMatrix.setElement(0, 0, 0.0); // đúng No
         costMatrix.setElement(1, 1, 0.0); // đúng Yes
