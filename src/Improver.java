@@ -12,13 +12,13 @@ public class Improver {
 
     public static void main(String[] args) throws Exception {
 
-        System.out.println("======================================================================");
+        printLine();
         System.out.println("=== HEART DISEASE - IMPROVEMENT EXPERIMENTS (STEP 3 - PHAM HUYNH DUC) ===");
-        System.out.println("======================================================================");
+        printLine();
 
         String arffPath = (args.length > 0)
                 ? args[0]
-                : "dataset/heart_disease_preprocessed.arff"; 
+                : "dataset/heart_disease_preprocessed.arff";
 
         // 1. Load dataset
         DataSource source = new DataSource(arffPath);
@@ -33,30 +33,35 @@ public class Improver {
         System.out.println("Class: " + data.classAttribute().name());
 
         // 2. Build improved model: Cost-Sensitive RandomForest
-        System.out.println("\n[Step] Building Cost-Sensitive RandomForest...");
+        System.out.println();
+        System.out.println("[Step] Building Cost-Sensitive RandomForest...");
         Classifier csRandomForest = buildCostSensitiveRandomForest(data);
 
         // 3. Evaluate with 10-fold CV
         System.out.println("[Step] Evaluating model with 10-fold cross-validation...");
         evaluateModel(csRandomForest, data, "CostSensitive RandomForest");
 
-        System.out.println("\n======================================================================");
+        printLine();
         System.out.println("=== END OF IMPROVEMENT EXPERIMENTS ===");
+        printLine();
+    }
+
+    private static void printLine() {
         System.out.println("======================================================================");
     }
 
     private static Classifier buildCostSensitiveRandomForest(Instances train) throws Exception {
         RandomForest rf = new RandomForest();
-        rf.setNumIterations(100);   
-        
-        rf.setMaxDepth(0);
+        rf.setNumIterations(100);   // số cây
+        rf.setMaxDepth(0);          // 0 = không giới hạn, rừng sẽ tự regularize
 
-        // cost matrix: rows = actual, cols = predicted
+        // Cost matrix: rows = actual, cols = predicted
+        // Giả sử: class 0 = No, class 1 = Yes
         CostMatrix costMatrix = new CostMatrix(2);
         costMatrix.setElement(0, 0, 0.0); // đúng No
         costMatrix.setElement(1, 1, 0.0); // đúng Yes
-        costMatrix.setElement(0, 1, 1.0); // FP
-        costMatrix.setElement(1, 0, 5.0); // FN (phạt nặng hơn)
+        costMatrix.setElement(0, 1, 1.0); // false positive
+        costMatrix.setElement(1, 0, 5.0); // false negative 
 
         CostSensitiveClassifier csc = new CostSensitiveClassifier();
         csc.setClassifier(rf);
@@ -76,7 +81,8 @@ public class Improver {
         long end = System.currentTimeMillis();
         long runtimeMs = end - start;
 
-        System.out.println("\n--------------------------------------------------------");
+        System.out.println();
+        System.out.println("--------------------------------------------------------");
         System.out.println("Improved Model: " + name);
         System.out.println("--------------------------------------------------------");
         System.out.printf("Accuracy: %.2f%%%n", eval.pctCorrect());
@@ -85,7 +91,8 @@ public class Improver {
         System.out.printf("Weighted F1-score:  %.4f%n", eval.weightedFMeasure());
         System.out.println("Runtime: " + runtimeMs + " ms");
 
-        System.out.println("\nPer-class details:");
+        System.out.println();
+        System.out.println("Per-class details:");
         System.out.println(eval.toClassDetailsString());
 
         System.out.println("Confusion Matrix:");
