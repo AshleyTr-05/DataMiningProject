@@ -18,7 +18,7 @@ public class Improver {
 
         String arffPath = (args.length > 0)
                 ? args[0]
-                : "dataset/heart_disease_preprocessed.arff"; // đúng với thư mục của bạn
+                : "dataset/heart_disease_preprocessed.arff"; 
 
         // 1. Load dataset
         DataSource source = new DataSource(arffPath);
@@ -47,7 +47,8 @@ public class Improver {
 
     private static Classifier buildCostSensitiveRandomForest(Instances train) throws Exception {
         RandomForest rf = new RandomForest();
-        rf.setNumIterations(100);   // ít cây hơn cho nhanh
+        rf.setNumIterations(100);   
+        
         rf.setMaxDepth(0);
 
         // cost matrix: rows = actual, cols = predicted
