@@ -379,8 +379,12 @@ public class Preprocessor {
     }
 
     public static void main(String[] args) throws Exception {
-        String inputCsv = "datasets/heart_disease.csv";
-        String outputArff = "datasets/heart_disease_preprocessed.arff";
+
+        String inputCsv = (args.length > 0) ? args[0] : "datasets/heart_disease.csv";
+        String outputArff = (args.length > 1) ? args[1] : "datasets/heart_disease_preprocessed.arff";
+
+        System.out.println("Input CSV: " + inputCsv);
+        System.out.println("Output ARFF: " + outputArff);
 
         preprocess(inputCsv, outputArff);
     }
