@@ -30,7 +30,7 @@ public class Improver {
 
         String arffPath = (args.length > 0)
                 ? args[0]
-                : "dataset/heart_disease_preprocessed.arff";
+                : "datasets/heart_disease_preprocessed.arff";
 
         // 1. Load dataset
         DataSource source = new DataSource(arffPath);
