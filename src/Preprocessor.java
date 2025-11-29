@@ -14,7 +14,7 @@ public class Preprocessor {
 
         // load CSV
         CSVLoader loader = new CSVLoader();
-        loader.setSource(new File(inputCsvPath)); // <-- datasets/heart_disease.csv
+        loader.setSource(new File(inputCsvPath));
         Instances data = loader.getDataSet();
 
         // set class attribute to last column
@@ -41,16 +41,18 @@ public class Preprocessor {
         // STEP 2: Remove duplicates
         data = removeDuplicates(data);
 
+        // STEP 3: Fill missing values
         fillMissingValues(data);
 
+        // Print report again
         printMissingAndZeroReport(data);
 
-        // Normalize numeric attributes
+        // STEP 4: Normalize numeric attributes
         System.out.println();
         normalizeNumericAttributes(data);
         System.out.println("=== NORMALIZATION COMPLETED ===");
 
-        // STEP 3: Convert categorical to numerical
+        // STEP 5: Convert categorical to numerical
         data = convertCategoricalToNumerical(data);
 
         // Final status report
@@ -69,6 +71,7 @@ public class Preprocessor {
         return outputArffPath;
     }
 
+    // --- Dataset summary ---
     public static void printDatasetSummary(Instances data) {
         System.out.println("=== Dataset Summary ===");
         System.out.println("Number of instances: " + data.numInstances());
@@ -176,6 +179,7 @@ public class Preprocessor {
         return uniqueData;
     }
 
+    // --- STEP: Fill missing values ---
     private static void fillMissingValues(Instances data) {
         System.out.println("=== FILLING MISSING VALUES (Mean for numeric, Mode for nominal) ===");
 
@@ -378,14 +382,42 @@ public class Preprocessor {
         System.out.println("=".repeat(70));
     }
 
+    // --- MAIN: handles absolute + relative paths, and auto ARFF naming ---
     public static void main(String[] args) throws Exception {
 
-        String inputCsv = (args.length > 0) ? args[0] : "datasets/heart_disease.csv";
-        String outputArff = (args.length > 1) ? args[1] : "datasets/heart_disease_preprocessed.arff";
+        // 1. Input CSV: from args or default
+        String inputCsv;
+        if (args.length > 0) {
+            // User gave an absolute or relative CSV path
+            inputCsv = args[0];
+        } else {
+            // Default dataset in project
+            inputCsv = "datasets/heart_disease.csv";
+        }
 
-        System.out.println("Input CSV: " + inputCsv);
+        // 2. Output ARFF: from args or auto-generate next to CSV
+        String outputArff;
+        if (args.length > 1) {
+            // User specified ARFF path
+            outputArff = args[1];
+        } else {
+            // Auto-generate ARFF in same folder as CSV
+            File inputFile = new File(inputCsv);
+            String parent = inputFile.getParent(); // may be null for relative
+            String baseName = inputFile.getName().replaceAll("\\.csv$", ""); // remove .csv
+
+            if (parent != null) {
+                outputArff = parent + File.separator + baseName + ".arff";
+            } else {
+                outputArff = baseName + ".arff";
+            }
+        }
+
+        // 3. Print for clarity
+        System.out.println("Input CSV:  " + inputCsv);
         System.out.println("Output ARFF: " + outputArff);
 
+        // 4. Run preprocessing
         preprocess(inputCsv, outputArff);
     }
 }
