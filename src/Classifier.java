@@ -17,8 +17,23 @@ public class Classifier {
         System.out.println("=".repeat(80));
 
         // 1. Load preprocessed ARFF dataset
-        DataSource source = new DataSource("datasets/heart_disease_preprocessed.arff");
+        // Support both absolute path and relative path
+        String datasetPath;
+        if (args.length > 0) {
+            // Use command line argument if provided
+            datasetPath = args[0];
+        } else {
+            // Default: use relative path
+            datasetPath = "datasets/heart_disease_preprocessed.arff";
+        }
+        
+        System.out.println("\n--- Loading Dataset ---");
+        System.out.println("Dataset path: " + datasetPath);
+        
+        DataSource source = new DataSource(datasetPath);
         Instances data = source.getDataSet();
+        
+        System.out.println("Dataset loaded successfully!");
 
         // 2. Set class attribute (last attribute)
         if (data.classIndex() == -1) {
