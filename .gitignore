@@ -1,0 +1,18 @@
+# Ignore compiled binary files
+bin/
+*.class
+
+# Ignore VS Code settings
+.vscode/
+
+# Ignore IntelliJ IDEA settings
+.idea/
+*.iml
+
+# Ignore build directories
+out/
+target/
+
+# Ignore logs
+*.log
+"bin/" 
