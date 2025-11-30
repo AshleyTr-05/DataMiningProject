@@ -44,7 +44,7 @@ public class Evaluator {
 
         // Improved Random Forest
         RandomForest rfImp = new RandomForest();
-        rfImp.setNumTrees(200);
+        rfImp.setNumIterations(200);
         rfImp.setMaxDepth(20);
         rfImp.setNumFeatures(5);
         evaluateModel("Random Forest (Improved)", rfImp, data);
