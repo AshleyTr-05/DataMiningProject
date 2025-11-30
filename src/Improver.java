@@ -9,18 +9,23 @@ import weka.classifiers.meta.CostSensitiveClassifier;
 import weka.classifiers.trees.RandomForest;
 import weka.classifiers.CostMatrix;
 
+import weka.classifiers.bayes.NaiveBayes;
+import weka.classifiers.lazy.IBk;
+import weka.classifiers.functions.Logistic;
+import weka.classifiers.functions.SMO;
 
-import weka.classifiers.bayes.NaiveBayes;              // Step 4 – thêm model
-import weka.classifiers.lazy.IBk;                      // kNN
-import weka.classifiers.functions.Logistic;            // Logistic Regression
-import weka.classifiers.functions.SMO;                 // SVM
-
-import weka.filters.Filter;                             // Step 4 – feature selection
-
+import weka.filters.Filter;
 
 import java.util.Random;
+import java.util.concurrent.*;
+import java.util.List;
+import java.util.ArrayList;
 
 public class Improver {
+    
+    // Number of threads for parallel execution
+    static int NUM_THREADS = Runtime.getRuntime().availableProcessors();
+    static ExecutorService executor = Executors.newFixedThreadPool(NUM_THREADS);
 
     public static void main(String[] args) throws Exception {
 
@@ -65,6 +70,9 @@ public class Improver {
         // 4.2 – Feature selection + RandomForest
         runFeatureSelectionExperiment(data);
 
+        // Shutdown executor
+        executor.shutdown();
+        
         printLine();
         System.out.println("=== END OF IMPROVEMENT EXPERIMENTS ===");
         printLine();
@@ -77,7 +85,8 @@ public class Improver {
     private static Classifier buildCostSensitiveRandomForest(Instances train) throws Exception {
         RandomForest rf = new RandomForest();
         rf.setNumIterations(100);   // số cây
-        rf.setMaxDepth(0);          // 0 = không giới hạn, rừng sẽ tự regularize
+        rf.setMaxDepth(0);          // 0 = không giới hạn
+        rf.setNumExecutionSlots(NUM_THREADS); // Use all CPU threads
 
         // Cost matrix: rows = actual, cols = predicted
         // Giả sử: class 0 = No, class 1 = Yes
@@ -125,35 +134,50 @@ public class Improver {
         System.out.println(eval.toMatrixString());
     }
 
-    // ===================== STEP 4 – ADD ANOTHER MODEL =====================
+    // ===================== STEP 4 – ADD ANOTHER MODEL (PARALLEL) =====================
 
     /**
-     * Step 4 – Thử thêm các mô hình baseline khác trên full feature set:
+     * Step 4 – Thử thêm các mô hình baseline khác trên full feature set (PARALLEL):
      * Logistic Regression, Naive Bayes, kNN (k=5), SVM (SMO).
      */
     private static void runAdditionalModels(Instances data) throws Exception {
         System.out.println();
-        System.out.println("[Step 4.1] Evaluating additional baseline models on full feature set...");
+        System.out.println("[Step 4.1] Evaluating additional baseline models in PARALLEL (" + NUM_THREADS + " threads)...");
 
-        Classifier[] models = new Classifier[] {
-                new Logistic(),
-                new NaiveBayes(),
-                new IBk(5),   // kNN với k = 5
-                new SMO()     // SVM
-        };
+        List<Future<String>> futures = new ArrayList<>();
+        
+        // Submit all models in parallel
+        futures.add(executor.submit(() -> {
+            Logistic log = new Logistic();
+            evaluateModel(log, new Instances(data), "Step 4 – Logistic Regression");
+            return "Logistic done";
+        }));
+        
+        futures.add(executor.submit(() -> {
+            NaiveBayes nb = new NaiveBayes();
+            evaluateModel(nb, new Instances(data), "Step 4 – Naive Bayes");
+            return "NaiveBayes done";
+        }));
+        
+        futures.add(executor.submit(() -> {
+            IBk knn = new IBk(5);
+            evaluateModel(knn, new Instances(data), "Step 4 – kNN (k=5)");
+            return "kNN done";
+        }));
+        
+        futures.add(executor.submit(() -> {
+            SMO svm = new SMO();
+            evaluateModel(svm, new Instances(data), "Step 4 – SVM (SMO)");
+            return "SVM done";
+        }));
 
-        String[] names = new String[] {
-                "Step 4 – Logistic Regression",
-                "Step 4 – Naive Bayes",
-                "Step 4 – kNN (k=5)",
-                "Step 4 – SVM (SMO)"
-        };
-
-        for (int i = 0; i < models.length; i++) {
-            System.out.println();
-            System.out.println("[Step 4.1] --------------------------------------------");
-            System.out.println("[Step 4.1] Model: " + names[i]);
-            evaluateModel(models[i], data, names[i]);
+        // Wait for all to complete
+        for (Future<String> future : futures) {
+            try {
+                future.get();
+            } catch (Exception e) {
+                System.err.println("Error: " + e.getMessage());
+            }
         }
     }
 

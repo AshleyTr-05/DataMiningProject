@@ -8,12 +8,20 @@ import weka.classifiers.trees.RandomForest;
 import weka.classifiers.Evaluation;
 
 import java.util.Random;
+import java.util.concurrent.*;
+import java.util.List;
+import java.util.ArrayList;
 
 public class Classifier {
+    
+    // Number of threads for parallel execution
+    static int NUM_THREADS = Runtime.getRuntime().availableProcessors();
+    static ExecutorService executor = Executors.newFixedThreadPool(NUM_THREADS);
 
     public static void main(String[] args) throws Exception {
         System.out.println("=".repeat(80));
-        System.out.println("=== HEART DISEASE CLASSIFICATION SYSTEM ===");
+        System.out.println("=== HEART DISEASE CLASSIFICATION SYSTEM (PARALLEL MODE) ===");
+        System.out.println("=== Using " + NUM_THREADS + " CPU threads ===");
         System.out.println("=".repeat(80));
 
         // 1. Load preprocessed ARFF dataset
@@ -43,43 +51,74 @@ public class Classifier {
         // Print dataset information
         printDatasetInfo(data);
 
-        // 3. Train and evaluate multiple classifiers
+        // 3. Train and evaluate multiple classifiers in PARALLEL
         System.out.println("\n" + "=".repeat(80));
-        System.out.println("=== TRAINING AND EVALUATING CLASSIFIERS ===");
+        System.out.println("=== TRAINING AND EVALUATING CLASSIFIERS (PARALLEL) ===");
         System.out.println("=".repeat(80));
 
+        // Create a list of classifier tasks
+        List<Future<String>> futures = new ArrayList<>();
+        
         // J48 Decision Tree
-        System.out.println("\n" + "█".repeat(80));
-        System.out.println("█ 1. J48 DECISION TREE");
-        System.out.println("█".repeat(80));
-        evaluateClassifier(new J48(), data, "J48 Decision Tree");
+        futures.add(executor.submit(() -> {
+            System.out.println("\n" + "█".repeat(80));
+            System.out.println("█ 1. J48 DECISION TREE");
+            System.out.println("█".repeat(80));
+            evaluateClassifier(new J48(), new Instances(data), "J48 Decision Tree");
+            return "J48 done";
+        }));
 
         // Naive Bayes
-        System.out.println("\n" + "█".repeat(80));
-        System.out.println("█ 2. NAIVE BAYES");
-        System.out.println("█".repeat(80));
-        evaluateClassifier(new NaiveBayes(), data, "Naive Bayes");
+        futures.add(executor.submit(() -> {
+            System.out.println("\n" + "█".repeat(80));
+            System.out.println("█ 2. NAIVE BAYES");
+            System.out.println("█".repeat(80));
+            evaluateClassifier(new NaiveBayes(), new Instances(data), "Naive Bayes");
+            return "NaiveBayes done";
+        }));
 
         // Support Vector Machine (SMO)
-        System.out.println("\n" + "█".repeat(80));
-        System.out.println("█ 3. SUPPORT VECTOR MACHINE (SVM)");
-        System.out.println("█".repeat(80));
-        evaluateClassifier(new SMO(), data, "SVM (SMO)");
+        futures.add(executor.submit(() -> {
+            System.out.println("\n" + "█".repeat(80));
+            System.out.println("█ 3. SUPPORT VECTOR MACHINE (SVM)");
+            System.out.println("█".repeat(80));
+            evaluateClassifier(new SMO(), new Instances(data), "SVM (SMO)");
+            return "SVM done";
+        }));
 
         // k-Nearest Neighbors (k=3)
-        System.out.println("\n" + "█".repeat(80));
-        System.out.println("█ 4. k-NEAREST NEIGHBORS (k=3)");
-        System.out.println("█".repeat(80));
-        IBk knn = new IBk(3);
-        evaluateClassifier(knn, data, "k-NN (k=3)");
+        futures.add(executor.submit(() -> {
+            System.out.println("\n" + "█".repeat(80));
+            System.out.println("█ 4. k-NEAREST NEIGHBORS (k=3)");
+            System.out.println("█".repeat(80));
+            IBk knn = new IBk(3);
+            evaluateClassifier(knn, new Instances(data), "k-NN (k=3)");
+            return "kNN done";
+        }));
 
-        // Random Forest
-        System.out.println("\n" + "█".repeat(80));
-        System.out.println("█ 5. RANDOM FOREST");
-        System.out.println("█".repeat(80));
-        RandomForest rf = new RandomForest();
-        rf.setNumIterations(100);
-        evaluateClassifier(rf, data, "Random Forest");
+        // Random Forest (with multi-threading enabled)
+        futures.add(executor.submit(() -> {
+            System.out.println("\n" + "█".repeat(80));
+            System.out.println("█ 5. RANDOM FOREST");
+            System.out.println("█".repeat(80));
+            RandomForest rf = new RandomForest();
+            rf.setNumIterations(100);
+            rf.setNumExecutionSlots(NUM_THREADS); // Use all CPU threads
+            evaluateClassifier(rf, new Instances(data), "Random Forest");
+            return "RandomForest done";
+        }));
+
+        // Wait for all classifiers to complete
+        for (Future<String> future : futures) {
+            try {
+                future.get();
+            } catch (Exception e) {
+                System.err.println("Error in classifier: " + e.getMessage());
+            }
+        }
+        
+        // Shutdown executor
+        executor.shutdown();
 
         // Final summary
         System.out.println("\n" + "=".repeat(80));

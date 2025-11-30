@@ -9,6 +9,7 @@ import weka.core.Instances;
 import weka.core.converters.ConverterUtils;
 
 import java.util.*;
+import java.util.concurrent.*;
 
 public class Evaluator {
 
@@ -37,8 +38,12 @@ public class Evaluator {
     }
 
     // Store baseline and improved results
-    static List<Result> baselineResults = new ArrayList<>();
-    static List<Result> improvedResults = new ArrayList<>();
+    static List<Result> baselineResults = Collections.synchronizedList(new ArrayList<>());
+    static List<Result> improvedResults = Collections.synchronizedList(new ArrayList<>());
+    
+    // Thread pool for parallel execution
+    static int NUM_THREADS = Runtime.getRuntime().availableProcessors();
+    static ExecutorService executor = Executors.newFixedThreadPool(NUM_THREADS);
 
     // Evaluate a model with 10-fold cross-validation
     static Result evaluate(String label, Classifier model, Instances data) throws Exception {
@@ -196,18 +201,16 @@ public class Evaluator {
 
     public static void main(String[] args) throws Exception {
         System.out.println("█".repeat(90));
-        System.out.println("█ HEART DISEASE PREDICTION - MODEL EVALUATION");
+        System.out.println("█ HEART DISEASE PREDICTION - MODEL EVALUATION (PARALLEL MODE)");
         System.out.println("█ 10-Fold Cross-Validation Analysis");
+        System.out.println("█ Using " + NUM_THREADS + " CPU threads for parallel execution");
         System.out.println("█".repeat(90));
 
         // Load dataset
-        // Load dataset (supports relative + absolute path)
         String datasetPath;
         if (args.length > 0) {
-            // User-specified path (can be relative or absolute)
             datasetPath = args[0];
         } else {
-            // Default dataset
             datasetPath = "datasets/heart_disease_preprocessed.arff";
         }
 
@@ -221,71 +224,98 @@ public class Evaluator {
         System.out.println("Attributes:" + data.numAttributes());
         System.out.println("Class:     " + data.classAttribute().name());
 
-        System.out.println("\nDataset: " + data.relationName());
-        System.out.println("Instances: " + data.numInstances());
-        System.out.println("Attributes: " + data.numAttributes());
-        System.out.println("Class: " + data.classAttribute().name());
-
-        // ========== BASELINE MODELS ==========
+        // ========== BASELINE MODELS (PARALLEL) ==========
         System.out.println("\n" + "█".repeat(90));
-        System.out.println("█ BASELINE MODELS");
+        System.out.println("█ BASELINE MODELS (Running in parallel)");
         System.out.println("█".repeat(90));
 
-        // J48 Baseline
-        J48 j48 = new J48();
-        baselineResults.add(evaluate("J48 (Baseline)", j48, data));
-        printDetailedResults(baselineResults.get(baselineResults.size() - 1));
+        List<Future<Result>> baselineFutures = new ArrayList<>();
+        
+        // Submit all baseline models in parallel
+        baselineFutures.add(executor.submit(() -> {
+            J48 j48 = new J48();
+            return evaluate("J48 (Baseline)", j48, new Instances(data));
+        }));
+        
+        baselineFutures.add(executor.submit(() -> {
+            RandomForest rf = new RandomForest();
+            rf.setNumIterations(100);
+            rf.setNumExecutionSlots(NUM_THREADS); // Use all threads for RF
+            return evaluate("Random Forest (Baseline)", rf, new Instances(data));
+        }));
+        
+        baselineFutures.add(executor.submit(() -> {
+            NaiveBayes nb = new NaiveBayes();
+            return evaluate("Naive Bayes (Baseline)", nb, new Instances(data));
+        }));
+        
+        baselineFutures.add(executor.submit(() -> {
+            SMO svm = new SMO();
+            return evaluate("SVM/SMO (Baseline)", svm, new Instances(data));
+        }));
+        
+        baselineFutures.add(executor.submit(() -> {
+            IBk knn = new IBk(3);
+            return evaluate("k-NN k=3 (Baseline)", knn, new Instances(data));
+        }));
 
-        // Random Forest Baseline
-        RandomForest rf = new RandomForest();
-        rf.setNumIterations(100);
-        baselineResults.add(evaluate("Random Forest (Baseline)", rf, data));
-        printDetailedResults(baselineResults.get(baselineResults.size() - 1));
+        // Collect baseline results
+        for (Future<Result> future : baselineFutures) {
+            try {
+                Result r = future.get();
+                baselineResults.add(r);
+                printDetailedResults(r);
+            } catch (Exception e) {
+                System.err.println("Error in baseline model: " + e.getMessage());
+            }
+        }
 
-        // Naive Bayes Baseline
-        NaiveBayes nb = new NaiveBayes();
-        baselineResults.add(evaluate("Naive Bayes (Baseline)", nb, data));
-        printDetailedResults(baselineResults.get(baselineResults.size() - 1));
-
-        // SVM Baseline
-        SMO svm = new SMO();
-        baselineResults.add(evaluate("SVM/SMO (Baseline)", svm, data));
-        printDetailedResults(baselineResults.get(baselineResults.size() - 1));
-
-        // k-NN Baseline
-        IBk knn = new IBk(3);
-        baselineResults.add(evaluate("k-NN k=3 (Baseline)", knn, data));
-        printDetailedResults(baselineResults.get(baselineResults.size() - 1));
-
-        // ========== IMPROVED MODELS ==========
+        // ========== IMPROVED MODELS (PARALLEL) ==========
         System.out.println("\n" + "█".repeat(90));
-        System.out.println("█ IMPROVED MODELS");
+        System.out.println("█ IMPROVED MODELS (Running in parallel)");
         System.out.println("█".repeat(90));
 
-        // J48 Improved
-        J48 j48Imp = new J48();
-        j48Imp.setConfidenceFactor(0.1f);
-        j48Imp.setMinNumObj(5);
-        improvedResults.add(evaluate("J48 (Improved)", j48Imp, data));
-        printDetailedResults(improvedResults.get(improvedResults.size() - 1));
+        List<Future<Result>> improvedFutures = new ArrayList<>();
+        
+        improvedFutures.add(executor.submit(() -> {
+            J48 j48Imp = new J48();
+            j48Imp.setConfidenceFactor(0.1f);
+            j48Imp.setMinNumObj(5);
+            return evaluate("J48 (Improved)", j48Imp, new Instances(data));
+        }));
+        
+        improvedFutures.add(executor.submit(() -> {
+            RandomForest rfImp = new RandomForest();
+            rfImp.setNumIterations(200);
+            rfImp.setNumFeatures(5);
+            rfImp.setNumExecutionSlots(NUM_THREADS); // Use all threads
+            return evaluate("Random Forest (Improved)", rfImp, new Instances(data));
+        }));
+        
+        improvedFutures.add(executor.submit(() -> {
+            NaiveBayes nbImp = new NaiveBayes();
+            nbImp.setUseKernelEstimator(true);
+            return evaluate("Naive Bayes (Improved)", nbImp, new Instances(data));
+        }));
+        
+        improvedFutures.add(executor.submit(() -> {
+            IBk knnImp = new IBk(5);
+            return evaluate("k-NN k=5 (Improved)", knnImp, new Instances(data));
+        }));
 
-        // Random Forest Improved
-        RandomForest rfImp = new RandomForest();
-        rfImp.setNumIterations(200);
-        rfImp.setNumFeatures(5);
-        improvedResults.add(evaluate("Random Forest (Improved)", rfImp, data));
-        printDetailedResults(improvedResults.get(improvedResults.size() - 1));
+        // Collect improved results
+        for (Future<Result> future : improvedFutures) {
+            try {
+                Result r = future.get();
+                improvedResults.add(r);
+                printDetailedResults(r);
+            } catch (Exception e) {
+                System.err.println("Error in improved model: " + e.getMessage());
+            }
+        }
 
-        // Naive Bayes Improved
-        NaiveBayes nbImp = new NaiveBayes();
-        nbImp.setUseKernelEstimator(true);
-        improvedResults.add(evaluate("Naive Bayes (Improved)", nbImp, data));
-        printDetailedResults(improvedResults.get(improvedResults.size() - 1));
-
-        // k-NN Improved
-        IBk knnImp = new IBk(5);
-        improvedResults.add(evaluate("k-NN k=5 (Improved)", knnImp, data));
-        printDetailedResults(improvedResults.get(improvedResults.size() - 1));
+        // Shutdown executor
+        executor.shutdown();
 
         // ========== 5.1 PERFORMANCE METRICS SUMMARY ==========
         System.out.println("\n" + "█".repeat(90));
