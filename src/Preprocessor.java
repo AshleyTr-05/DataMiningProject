@@ -4,6 +4,7 @@ import weka.core.converters.CSVLoader;
 import weka.core.converters.ArffSaver;
 import weka.filters.Filter;
 import weka.filters.unsupervised.attribute.NominalToBinary;
+import weka.filters.unsupervised.attribute.NumericToNominal;
 import weka.filters.unsupervised.instance.RemoveDuplicates;
 import weka.filters.unsupervised.attribute.Remove;
 
@@ -24,6 +25,23 @@ public class Preprocessor {
         // set class attribute to last column
         if (data.classIndex() == -1) {
             data.setClassIndex(data.numAttributes() - 1);
+        }
+
+        if (data.classAttribute().isNumeric()) {
+            System.out.println();
+            System.out.println("=== CLASS ATTRIBUTE IS NUMERIC: CONVERTING TO NOMINAL ===");
+            System.out.println("Class attribute name: " + data.classAttribute().name());
+
+            NumericToNominal num2nom = new NumericToNominal();
+            // Weka uses 1-based indices for filters; "last" = class
+            num2nom.setAttributeIndices("" + (data.classIndex() + 1));
+            num2nom.setInputFormat(data);
+            data = Filter.useFilter(data, num2nom);
+
+            // Re-set class index (since data reference changed)
+            data.setClassIndex(data.numAttributes() - 1);
+
+            System.out.println("Class attribute converted to nominal.");
         }
 
         // print Basic dataset summary
