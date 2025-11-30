@@ -5,8 +5,12 @@ import weka.core.converters.ArffSaver;
 import weka.filters.Filter;
 import weka.filters.unsupervised.attribute.NominalToBinary;
 import weka.filters.unsupervised.instance.RemoveDuplicates;
+import weka.filters.unsupervised.attribute.Remove;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 
 public class Preprocessor {
 
@@ -22,7 +26,7 @@ public class Preprocessor {
             data.setClassIndex(data.numAttributes() - 1);
         }
 
-        // print Basic data set summary
+        // print Basic dataset summary
         printDatasetSummary(data);
 
         // print Missing and Zero values report (BEFORE cleaning)
@@ -33,7 +37,7 @@ public class Preprocessor {
         // STEP 1: handle suspicious zeros by marking them as missing
         handleZeroAsMissing(data);
 
-        // print Missing and Zero values report (AFTER cleaning)
+        // print Missing and Zero values report (AFTER zero->missing)
         System.out.println();
         System.out.println("=== AFTER ZERO TO MISSING HANDLING ===");
         printMissingAndZeroReport(data);
@@ -44,7 +48,7 @@ public class Preprocessor {
         // STEP 3: Fill missing values
         fillMissingValues(data);
 
-        // Print report again
+        // Print report again after filling
         printMissingAndZeroReport(data);
 
         // STEP 4: Normalize numeric attributes
@@ -52,7 +56,7 @@ public class Preprocessor {
         normalizeNumericAttributes(data);
         System.out.println("=== NORMALIZATION COMPLETED ===");
 
-        // STEP 5: Convert categorical to numerical
+        // STEP 5: Convert categorical to numerical (safe version)
         data = convertCategoricalToNumerical(data);
 
         // Final status report
@@ -80,10 +84,10 @@ public class Preprocessor {
         System.out.println("Attribute list:");
         for (int i = 0; i < data.numAttributes(); i++) {
             Attribute attr = data.attribute(i);
-            System.out.printf("  [%d] %s (%s)%n",
-                    i,
-                    attr.name(),
-                    attr.isNumeric() ? "numeric" : "nominal");
+            String type = attr.isNumeric() ? "numeric" : (attr.isNominal() ? "nominal" : "other");
+            String extra = attr.isNominal() ? (" | numValues=" + attr.numValues()) : "";
+            System.out.printf("  [%d] %s (%s%s)%n",
+                    i, attr.name(), type, extra);
         }
     }
 
@@ -117,12 +121,15 @@ public class Preprocessor {
     }
 
     // --- STEP: treat 0 as missing for selected numeric attributes ---
+    // Works in two modes:
+    // 1) If this looks like the heart_disease dataset -> use specific medical attributes.
+    // 2) Otherwise -> generic heuristic for any dataset.
     private static void handleZeroAsMissing(Instances data) {
         System.out.println();
         System.out.println("=== HANDLING ZERO VALUES AS MISSING FOR SELECTED ATTRIBUTES ===");
 
-        // List of attribute names where 0 is considered invalid/missing
-        String[] zeroAsMissingAttrs = {
+        // 1) Preferred known attribute names (heart_disease-style datasets)
+        String[] preferredZeroAsMissingAttrs = {
                 "age",
                 "blood_pressure",
                 "cholesterol_level",
@@ -130,24 +137,61 @@ public class Preprocessor {
                 "triglyceride_level",
                 "fasting_blood_sugar",
                 "crp_level",
-                "homocysteine_level",
+                "homocysteine_level"
         };
+
+        Set<Integer> selectedAttrIndices = new HashSet<>();
+
+        // Try to select by explicit names first (if they exist in this dataset)
+        for (String name : preferredZeroAsMissingAttrs) {
+            Attribute attr = data.attribute(name);
+            if (attr != null && attr.isNumeric()) {
+                selectedAttrIndices.add(attr.index());
+            }
+        }
+
+        // 2) If nothing selected (different dataset, e.g. T_data_*), use a generic heuristic:
+        //    - numeric attribute
+        //    - not class
+        //    - has at least one 0 and at least one non-zero
+        if (selectedAttrIndices.isEmpty()) {
+            for (int j = 0; j < data.numAttributes(); j++) {
+                if (j == data.classIndex()) continue;
+                Attribute attr = data.attribute(j);
+                if (!attr.isNumeric()) continue;
+
+                boolean hasZero = false;
+                boolean hasNonZero = false;
+
+                for (int i = 0; i < data.numInstances(); i++) {
+                    if (data.instance(i).isMissing(j)) continue;
+                    double val = data.instance(i).value(j);
+                    if (val == 0.0) {
+                        hasZero = true;
+                    } else {
+                        hasNonZero = true;
+                    }
+                    if (hasZero && hasNonZero) break;
+                }
+
+                if (hasZero && hasNonZero) {
+                    selectedAttrIndices.add(j);
+                }
+            }
+        }
 
         int totalReplaced = 0;
 
-        for (String name : zeroAsMissingAttrs) {
-            Attribute attr = data.attribute(name);
-            if (attr == null || !attr.isNumeric()) {
-                // Attribute with this name does not exist in this dataset
-                continue;
-            }
-
+        // 3) Actually replace zeros with missing in the selected attributes
+        for (int j : selectedAttrIndices) {
+            Attribute attr = data.attribute(j);
             int replacedForThisAttr = 0;
+
             for (int i = 0; i < data.numInstances(); i++) {
-                if (!data.instance(i).isMissing(attr)) {
-                    double val = data.instance(i).value(attr);
+                if (!data.instance(i).isMissing(j)) {
+                    double val = data.instance(i).value(j);
                     if (val == 0.0) {
-                        data.instance(i).setMissing(attr);
+                        data.instance(i).setMissing(j);
                         replacedForThisAttr++;
                     }
                 }
@@ -214,7 +258,7 @@ public class Preprocessor {
                     }
                 }
 
-                System.out.printf("Numeric attribute %-20s | Filled: %4d | Mean used: %.2f%n",
+                System.out.printf("Numeric attribute %-20s | Filled: %4d | Mean used: %.4f%n",
                         attr.name(), filledForAttr, mean);
                 totalFilled += filledForAttr;
 
@@ -280,7 +324,7 @@ public class Preprocessor {
 
             // Avoid divide by zero: if all values are same, set them to 0
             if (min == max) {
-                System.out.printf("Attribute %-20s has constant value %.2f; setting all to 0.0%n",
+                System.out.printf("Attribute %-20s has constant value %.4f; setting all to 0.0%n",
                         attr.name(), min);
                 for (int i = 0; i < data.numInstances(); i++) {
                     data.instance(i).setValue(j, 0.0);
@@ -295,37 +339,97 @@ public class Preprocessor {
                 data.instance(i).setValue(j, newVal);
             }
 
-            System.out.printf("Attribute %-20s normalized using min=%.2f, max=%.2f%n",
+            System.out.printf("Attribute %-20s normalized using min=%.4f, max=%.4f%n",
                     attr.name(), min, max);
         }
     }
 
     // --- STEP: Convert categorical (nominal) attributes to numerical ---
+    //          Safe version that avoids OutOfMemory by removing huge-cardinality attributes
     private static Instances convertCategoricalToNumerical(Instances data) throws Exception {
         System.out.println();
         System.out.println("=== CONVERTING CATEGORICAL TO NUMERICAL (Binary Encoding) ===");
 
-        // Count nominal attributes (excluding class)
-        int nominalCount = 0;
+        // 1. Log nominal attributes and detect high-cardinality ones
+        System.out.println("=== NOMINAL ATTRIBUTES (excluding class) ===");
+        int classIndex = data.classIndex();
+        int MAX_VALUES_FOR_BINARY = 50;   // threshold; tune if needed
+
+        ArrayList<Integer> highCardinalityIndices = new ArrayList<>();
+
         for (int j = 0; j < data.numAttributes(); j++) {
-            if (data.attribute(j).isNominal() && j != data.classIndex()) {
+            Attribute attr = data.attribute(j);
+            if (attr.isNominal() && j != classIndex) {
+                int numValues = attr.numValues();
+                System.out.printf("  - %s | index=%d | numValues=%d%n",
+                        attr.name(), j, numValues);
+                if (numValues > MAX_VALUES_FOR_BINARY) {
+                    highCardinalityIndices.add(j);
+                }
+            }
+        }
+
+        // 2. Remove high-cardinality nominal attributes to avoid dimension explosion
+        Instances workingData = new Instances(data);
+        if (!highCardinalityIndices.isEmpty()) {
+            System.out.println("Removing high-cardinality nominal attributes before NominalToBinary:");
+            for (int idx : highCardinalityIndices) {
+                Attribute attr = data.attribute(idx);
+                System.out.println("  * " + attr.name());
+            }
+
+            // Build a fresh index array using names (to avoid shifting index problems)
+            Set<String> highCardNames = new HashSet<>();
+            for (int j : highCardinalityIndices) {
+                highCardNames.add(data.attribute(j).name());
+            }
+
+            ArrayList<Integer> toRemoveInWorking = new ArrayList<>();
+            for (int j = 0; j < workingData.numAttributes(); j++) {
+                if (highCardNames.contains(workingData.attribute(j).name())) {
+                    toRemoveInWorking.add(j);
+                }
+            }
+
+            int[] removeIdxArray = new int[toRemoveInWorking.size()];
+            for (int k = 0; k < toRemoveInWorking.size(); k++) {
+                removeIdxArray[k] = toRemoveInWorking.get(k);
+            }
+
+            Remove removeFilter = new Remove();
+            removeFilter.setAttributeIndicesArray(removeIdxArray);
+            removeFilter.setInvertSelection(false);
+            removeFilter.setInputFormat(workingData);
+            workingData = Filter.useFilter(workingData, removeFilter);
+
+            // Re-set class index (last attribute)
+            if (workingData.classIndex() == -1) {
+                workingData.setClassIndex(workingData.numAttributes() - 1);
+            }
+        }
+
+        // 3. Count remaining nominal attributes (excluding class)
+        int nominalCount = 0;
+        for (int j = 0; j < workingData.numAttributes(); j++) {
+            if (workingData.attribute(j).isNominal() && j != workingData.classIndex()) {
                 nominalCount++;
             }
         }
 
-        System.out.printf("Found %d categorical attributes (excluding class)%n", nominalCount);
+        System.out.printf("Found %d categorical attributes (excluding class) after removing high-cardinality ones.%n",
+                nominalCount);
 
         if (nominalCount == 0) {
             System.out.println("No categorical attributes to convert.");
-            return data;
+            return workingData;
         }
 
-        // Apply NominalToBinary filter
+        // 4. Apply NominalToBinary filter safely
         NominalToBinary nominalToBinary = new NominalToBinary();
-        nominalToBinary.setInputFormat(data);
-        Instances transformedData = Filter.useFilter(data, nominalToBinary);
+        nominalToBinary.setInputFormat(workingData);
+        Instances transformedData = Filter.useFilter(workingData, nominalToBinary);
 
-        System.out.printf("Attributes before conversion: %d%n", data.numAttributes());
+        System.out.printf("Attributes before conversion: %d%n", workingData.numAttributes());
         System.out.printf("Attributes after conversion: %d%n", transformedData.numAttributes());
         System.out.println("Categorical attributes have been converted to binary (0/1) format.");
 
@@ -335,9 +439,9 @@ public class Preprocessor {
     // --- Final comprehensive status report ---
     private static void printFinalStatusReport(Instances data) {
         System.out.println();
-        System.out.println("=".repeat(70));
+        System.out.println("======================================================================");
         System.out.println("=== FINAL PREPROCESSING STATUS REPORT ===");
-        System.out.println("=".repeat(70));
+        System.out.println("======================================================================");
 
         System.out.println("\n1. DATASET OVERVIEW:");
         System.out.printf("   - Total instances: %d%n", data.numInstances());
@@ -356,7 +460,7 @@ public class Preprocessor {
         System.out.printf("   - Total missing values: %d %n", totalMissing);
 
         System.out.println("\n3. DUPLICATES:");
-        System.out.println("   - All duplicate rows have been removed ");
+        System.out.println("   - All duplicate rows have been removed.");
 
         System.out.println("\n4. ATTRIBUTE TYPES:");
         int numericCount = 0;
@@ -372,14 +476,14 @@ public class Preprocessor {
         System.out.printf("   - Nominal attributes: %d (including class)%n", nominalCount);
 
         System.out.println("\n5. NORMALIZATION:");
-        System.out.println("   - All numeric attributes normalized to [0, 1] ");
+        System.out.println("   - All numeric attributes normalized to [0, 1].");
 
         System.out.println("\n6. CATEGORICAL CONVERSION:");
-        System.out.println("   - Categorical attributes converted to numerical (binary) ");
+        System.out.println("   - Categorical attributes converted to numerical (binary) where applicable.");
 
-        System.out.println("\n" + "=".repeat(70));
+        System.out.println("\n======================================================================");
         System.out.println(" ALL PREPROCESSING STEPS COMPLETED SUCCESSFULLY");
-        System.out.println("=".repeat(70));
+        System.out.println("======================================================================");
     }
 
     // --- MAIN: handles absolute + relative paths, and auto ARFF naming ---
