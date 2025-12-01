@@ -15,24 +15,40 @@ public class Main {
         System.out.println("║           HEART DISEASE DATA MINING - COMPLETE PIPELINE                       ║");
         System.out.println("╚════════════════════════════════════════════════════════════════════════════════╝");
         
-        // Default paths (relative to project root, not src folder)
-        // When running from src/, we need to go up one level
-        String baseDir = System.getProperty("user.dir");
-        
-        // Check if we're running from src directory
-        if (baseDir.endsWith("src")) {
-            baseDir = baseDir.substring(0, baseDir.length() - 4); // Remove "/src"
+        // Check if dataset path is provided
+        if (args.length == 0) {
+            System.err.println("Error: No dataset path provided!");
+            System.err.println();
+            System.err.println("Usage:");
+            System.err.println("  java -cp \"bin;lib/*\" Main <input_csv> [output_arff]");
+            System.err.println();
+            System.err.println("Examples:");
+            System.err.println("  # Using relative path:");
+            System.err.println("  java -cp \"bin;lib/*\" Main datasets/heart_disease.csv");
+            System.err.println();
+            System.err.println("  # Using absolute path:");
+            System.err.println("  java -cp \"bin;lib/*\" Main \"C:\\Users\\ADMIN\\Downloads\\DataMiningProject\\datasets\\heart_disease.csv\"");
+            System.err.println();
+            System.err.println("  # Specify both input and output:");
+            System.err.println("  java -cp \"bin;lib/*\" Main datasets/heart_disease.csv datasets/output.arff");
+            System.exit(1);
         }
         
-        String inputCsv = baseDir + "/datasets/heart_disease.csv";
-        String outputArff = baseDir + "/datasets/heart_disease_preprocessed.arff";
+        // Get input CSV from command line argument
+        String inputCsv = args[0];
         
-        // Override with command line arguments if provided
-        if (args.length > 0) {
-            inputCsv = args[0];
-        }
+        // Generate output ARFF path
+        String outputArff;
         if (args.length > 1) {
+            // Use provided output path
             outputArff = args[1];
+        } else {
+            // Auto-generate output path based on input
+            if (inputCsv.endsWith(".csv")) {
+                outputArff = inputCsv.substring(0, inputCsv.length() - 4) + "_preprocessed.arff";
+            } else {
+                outputArff = inputCsv + "_preprocessed.arff";
+            }
         }
         
         long totalStart = System.currentTimeMillis();
@@ -100,13 +116,14 @@ public class Main {
         long step3Start = System.currentTimeMillis();
         
         try {
-            // Call Evaluator.main with the preprocessed ARFF path
-            String[] evaluatorArgs = {outputArff};
-            Evaluator.main(evaluatorArgs);
+            // Call Evaluator.main with the preprocessed ARFF path (if exists)
+            System.out.println("\n⚠ Evaluator class not implemented yet. Skipping evaluation step.");
+            // String[] evaluatorArgs = {outputArff};
+            // Evaluator.main(evaluatorArgs);
             
             long step3End = System.currentTimeMillis();
             step3Time = step3End - step3Start;
-            System.out.println("\n✓ Evaluation completed in " + step3Time + " ms");
+            // System.out.println("\n✓ Evaluation completed in " + step3Time + " ms");
             
         } catch (Exception e) {
             System.err.println("✗ Evaluation failed: " + e.getMessage());
@@ -122,9 +139,10 @@ public class Main {
         long step4Start = System.currentTimeMillis();
         
         try {
-            // Call Improver.main with the preprocessed ARFF path
-            String[] improverArgs = {outputArff};
-            Improver.main(improverArgs);
+            // Call Improver.main with the preprocessed ARFF path (if exists)
+            System.out.println("\n⚠ Improver class not implemented yet. Skipping improvement step.");
+            // String[] improverArgs = {outputArff};
+            // Improver.main(improverArgs);
             
             long step4End = System.currentTimeMillis();
             step4Time = step4End - step4Start;
